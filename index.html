@@ -220,6 +220,88 @@
     transform: translateY(-1px);
     box-shadow: 0 12px 26px -8px rgba(238,26,99,0.55);
   }
+  button#submit .spinner {
+    display: inline-block;
+    width: 13px;
+    height: 13px;
+    border-radius: 50%;
+    border: 2px solid rgba(26,4,16,0.3);
+    border-top-color: #1a0410;
+    animation: spin 0.7s linear infinite;
+    vertical-align: -2px;
+    margin-right: 8px;
+  }
+  @keyframes spin { to { transform: rotate(360deg); } }
+
+  /* ---------- Resultado da busca ---------- */
+  #result {
+    margin-top: 22px;
+    max-height: 0;
+    overflow: hidden;
+    opacity: 0;
+    transition: max-height 0.5s ease, opacity 0.4s ease, margin-top 0.4s ease;
+  }
+  #result.show {
+    max-height: 600px;
+    opacity: 1;
+  }
+
+  .result-card {
+    border-top: 1px solid rgba(255,255,255,0.1);
+    padding-top: 18px;
+  }
+
+  .result-name {
+    font-size: 14px;
+    font-weight: 700;
+    color: #f5f6f9;
+    margin: 0 0 3px;
+  }
+  .result-status {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.05em;
+    text-transform: uppercase;
+    color: #33c98a;
+    margin: 0 0 16px;
+  }
+  .result-status.inactive { color: #e2664f; }
+  .result-status .dot {
+    width: 6px; height: 6px; border-radius: 50%; background: currentColor;
+  }
+
+  .result-row {
+    display: flex;
+    gap: 12px;
+    margin-bottom: 14px;
+  }
+  .result-row svg { flex: none; margin-top: 2px; }
+  .result-row .rl {
+    font-size: 10.5px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #6a7185;
+    margin: 0 0 3px;
+  }
+  .result-row .rv {
+    font-size: 13.5px;
+    color: #dfe3ec;
+    line-height: 1.45;
+    margin: 0;
+  }
+  .result-row .rv.muted { color: #6a7185; font-style: italic; }
+
+  .result-error {
+    font-size: 13px;
+    color: #e2664f;
+    line-height: 1.5;
+    padding-top: 18px;
+    border-top: 1px solid rgba(255,255,255,0.1);
+  }
 </style>
 </head>
 <body>
@@ -259,6 +341,8 @@
       <p class="helper" id="cnpjHelper">Digite apenas os números — a formatação é automática.</p>
 
       <button type="submit" id="submit" disabled>Buscar prestador</button>
+
+      <div id="result"></div>
     </form>
   </section>
 </div>
@@ -516,12 +600,118 @@
     }
   });
 
+  // ---------- Formatação de exibição ----------
+  function formatPhone(ddd, numero) {
+    if (!ddd || !numero) return null;
+    const clean = numero.replace(/\D/g, '');
+    if (clean.length === 9) {
+      return `(${ddd}) ${clean.slice(0, 5)}-${clean.slice(5)}`;
+    }
+    if (clean.length === 8) {
+      return `(${ddd}) ${clean.slice(0, 4)}-${clean.slice(4)}`;
+    }
+    return `(${ddd}) ${clean}`;
+  }
+
+  function formatCEP(cep) {
+    if (!cep) return null;
+    const c = String(cep).replace(/\D/g, '');
+    return c.length === 8 ? `${c.slice(0, 5)}-${c.slice(5)}` : c;
+  }
+
+  function svgIcon(pathD) {
+    return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ee1a63" stroke-width="2">${pathD}</svg>`;
+  }
+
+  const ICONS = {
+    phone: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3.1-8.7A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 2 .7 3a2 2 0 0 1-.4 2.1L8 10.3a16 16 0 0 0 6 6l1.5-1.4a2 2 0 0 1 2.1-.4c1 .3 2 .5 3 .7a2 2 0 0 1 1.7 2z"/>',
+    mail: '<path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="M22 6l-10 7L2 6"/>',
+    pin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>',
+    building: '<path d="M4 19V5a2 2 0 0 1 2-2h8l6 6v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M14 3v6h6"/>'
+  };
+
+  function renderRow(iconKey, label, value, muted) {
+    return `
+      <div class="result-row">
+        ${svgIcon(ICONS[iconKey])}
+        <div>
+          <p class="rl">${label}</p>
+          <p class="rv${muted ? ' muted' : ''}">${value}</p>
+        </div>
+      </div>`;
+  }
+
+  async function buscarPrestador(digits) {
+    const resultBox = document.getElementById('result');
+    resultBox.classList.remove('show');
+
+    btn.disabled = true;
+    const originalLabel = btn.textContent;
+    btn.innerHTML = '<span class="spinner"></span>Buscando…';
+
+    try {
+      const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${digits}`, {
+        headers: { 'Accept': 'application/json' }
+      });
+
+      if (res.status === 404) {
+        resultBox.innerHTML = `<p class="result-error">CNPJ não encontrado na base da Receita Federal. Confira o número e tente novamente.</p>`;
+        resultBox.classList.add('show');
+        return;
+      }
+      if (!res.ok) {
+        throw new Error('status ' + res.status);
+      }
+
+      const data = await res.json();
+
+      const telefone1 = formatPhone(data.ddd_telefone_1?.slice(0, 2) || null, data.ddd_telefone_1?.slice(2) || null);
+      const telefone2 = formatPhone(data.ddd_telefone_2?.slice(0, 2) || null, data.ddd_telefone_2?.slice(2) || null);
+      const email = data.email && data.email.trim() ? data.email : null;
+
+      const enderecoLinhas = [
+        [data.descricao_tipo_de_logradouro, data.logradouro].filter(Boolean).join(' '),
+        data.numero && data.numero !== 'S/N' ? `nº ${data.numero}` : null,
+        data.complemento || null
+      ].filter(Boolean).join(', ');
+
+      const cidadeLinha = [data.bairro, data.municipio, data.uf].filter(Boolean).join(' – ');
+      const cepLinha = formatCEP(data.cep);
+
+      const ativa = data.descricao_situacao_cadastral === 'ATIVA';
+
+      resultBox.innerHTML = `
+        <div class="result-card">
+          <p class="result-name">${data.nome_fantasia || data.razao_social || 'Prestador encontrado'}</p>
+          <p class="result-status${ativa ? '' : ' inactive'}">
+            <span class="dot"></span>${data.descricao_situacao_cadastral || 'situação não informada'}
+          </p>
+
+          ${renderRow('phone', 'Telefone', [telefone1, telefone2].filter(Boolean).join(' · ') || 'Não informado', !telefone1)}
+          ${renderRow('mail', 'E-mail', email || 'Não informado na Receita Federal', !email)}
+          ${renderRow('building', 'Endereço', enderecoLinhas || 'Não informado', !enderecoLinhas)}
+          ${renderRow('pin', 'Bairro / cidade / CEP', [cidadeLinha, cepLinha].filter(Boolean).join(' · ') || 'Não informado', !cidadeLinha)}
+        </div>
+      `;
+      resultBox.classList.add('show');
+
+    } catch (err) {
+      console.error('Erro ao consultar CNPJ:', err);
+      resultBox.innerHTML = `<p class="result-error">Não foi possível consultar esse CNPJ agora. Verifique sua conexão e tente novamente.</p>`;
+      resultBox.classList.add('show');
+    } finally {
+      btn.disabled = false;
+      btn.textContent = originalLabel;
+      // reavalia se o botão deve continuar habilitado (CNPJ ainda válido)
+      btn.disabled = !isValidCNPJ(onlyDigits(input.value));
+    }
+  }
+
   form.addEventListener('submit', (e) => {
     e.preventDefault();
     const digits = onlyDigits(input.value);
     if (!isValidCNPJ(digits)) return;
-    console.log('CNPJ capturado pelo ÍCARO:', digits);
-    alert('CNPJ capturado: ' + digits + '\n\n(Próxima fase: o Ícaro inicia as buscas a partir daqui.)');
+    buscarPrestador(digits);
   });
 })();
 </script>
