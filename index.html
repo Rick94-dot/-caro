@@ -641,6 +641,8 @@
       </div>`;
   }
 
+  const ICARO_API = 'https://icaro-backend.onrender.com'; // backend hospedado no Render
+
   async function buscarPrestador(digits) {
     const resultBox = document.getElementById('result');
     resultBox.classList.remove('show');
@@ -650,45 +652,39 @@
     btn.innerHTML = '<span class="spinner"></span>Buscando…';
 
     try {
-      const res = await fetch(`https://brasilapi.com.br/api/cnpj/v1/${digits}`, {
+      const res = await fetch(`${ICARO_API}/api/consulta/${digits}`, {
         headers: { 'Accept': 'application/json' }
       });
 
       if (res.status === 404) {
-        resultBox.innerHTML = `<p class="result-error">CNPJ não encontrado na base da Receita Federal. Confira o número e tente novamente.</p>`;
+        resultBox.innerHTML = `<p class="result-error">CNPJ não encontrado. Confira o número e tente novamente.</p>`;
         resultBox.classList.add('show');
         return;
       }
-      if (!res.ok) {
-        throw new Error('status ' + res.status);
-      }
+      if (!res.ok) throw new Error('status ' + res.status);
 
       const data = await res.json();
+      const c = data.consolidado || {};
+      const rf = data.fontes?.receita_federal;
 
-      const telefone1 = formatPhone(data.ddd_telefone_1?.slice(0, 2) || null, data.ddd_telefone_1?.slice(2) || null);
-      const telefone2 = formatPhone(data.ddd_telefone_2?.slice(0, 2) || null, data.ddd_telefone_2?.slice(2) || null);
-      const email = data.email && data.email.trim() ? data.email : null;
+      const enderecoLinhas = c.endereco ? [
+        [c.endereco.logradouro, c.endereco.numero ? `nº ${c.endereco.numero}` : null, c.endereco.complemento].filter(Boolean).join(', '),
+      ].filter(Boolean).join('') : '';
 
-      const enderecoLinhas = [
-        [data.descricao_tipo_de_logradouro, data.logradouro].filter(Boolean).join(' '),
-        data.numero && data.numero !== 'S/N' ? `nº ${data.numero}` : null,
-        data.complemento || null
-      ].filter(Boolean).join(', ');
+      const cidadeLinha = c.endereco ? [c.endereco.bairro, c.endereco.municipio, c.endereco.uf].filter(Boolean).join(' – ') : '';
+      const cepLinha = c.endereco?.cep ? formatCEP(c.endereco.cep) : '';
 
-      const cidadeLinha = [data.bairro, data.municipio, data.uf].filter(Boolean).join(' – ');
-      const cepLinha = formatCEP(data.cep);
-
-      const ativa = data.descricao_situacao_cadastral === 'ATIVA';
+      const ativa = c.situacao_cadastral === 'ATIVA';
 
       resultBox.innerHTML = `
         <div class="result-card">
-          <p class="result-name">${data.nome_fantasia || data.razao_social || 'Prestador encontrado'}</p>
+          <p class="result-name">${c.nome || 'Prestador encontrado'}</p>
           <p class="result-status${ativa ? '' : ' inactive'}">
-            <span class="dot"></span>${data.descricao_situacao_cadastral || 'situação não informada'}
+            <span class="dot"></span>${c.situacao_cadastral || 'situação não informada'}
           </p>
 
-          ${renderRow('phone', 'Telefone', [telefone1, telefone2].filter(Boolean).join(' · ') || 'Não informado', !telefone1)}
-          ${renderRow('mail', 'E-mail', email || 'Não informado na Receita Federal', !email)}
+          ${renderRow('phone', 'Telefone', (c.telefones || []).join(' · ') || 'Não informado', !(c.telefones || []).length)}
+          ${renderRow('mail', 'E-mail', (c.emails || []).join(' · ') || 'Não informado na Receita Federal', !(c.emails || []).length)}
           ${renderRow('building', 'Endereço', enderecoLinhas || 'Não informado', !enderecoLinhas)}
           ${renderRow('pin', 'Bairro / cidade / CEP', [cidadeLinha, cepLinha].filter(Boolean).join(' · ') || 'Não informado', !cidadeLinha)}
         </div>
@@ -697,12 +693,11 @@
 
     } catch (err) {
       console.error('Erro ao consultar CNPJ:', err);
-      resultBox.innerHTML = `<p class="result-error">Não foi possível consultar esse CNPJ agora. Verifique sua conexão e tente novamente.</p>`;
+      resultBox.innerHTML = `<p class="result-error">Não foi possível falar com o backend do ÍCARO agora. Confira se ele está rodando em ${ICARO_API} e tente novamente.</p>`;
       resultBox.classList.add('show');
     } finally {
       btn.disabled = false;
       btn.textContent = originalLabel;
-      // reavalia se o botão deve continuar habilitado (CNPJ ainda válido)
       btn.disabled = !isValidCNPJ(onlyDigits(input.value));
     }
   }
