@@ -1,0 +1,530 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>ÍCARO</title>
+<style>
+  * { box-sizing: border-box; }
+
+  html {
+    scroll-behavior: smooth;
+  }
+
+  html, body {
+    margin: 0;
+    padding: 0;
+    width: 100%;
+    background: #05070c;
+    font-family: 'Segoe UI', Arial, sans-serif;
+  }
+
+  /* ---------- Palco fixo: globo + label, sempre no fundo ---------- */
+  .stage {
+    position: fixed;
+    inset: 0;
+    z-index: 0;
+  }
+
+  #globeCanvas {
+    position: absolute;
+    inset: 0;
+    display: block;
+    transition: filter 0.6s ease, transform 0.6s ease;
+  }
+
+  .vignette {
+    position: absolute;
+    inset: 0;
+    pointer-events: none;
+    background:
+      radial-gradient(ellipse at center, rgba(5,7,12,0) 30%, rgba(5,7,12,0.55) 78%, rgba(5,7,12,0.96) 100%);
+  }
+
+  .label {
+    position: absolute;
+    inset: 0;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    pointer-events: none;
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+  .label h1 {
+    margin: 0;
+    font-size: clamp(72px, 17vw, 260px);
+    font-weight: 800;
+    letter-spacing: 0.06em;
+    color: rgba(240,244,255,0.94);
+    text-shadow: 0 0 60px rgba(238,26,99,0.35), 0 0 120px rgba(47,216,224,0.15);
+  }
+  .label h1 span { color: #ee1a63; }
+
+  body.form-active #globeCanvas {
+    filter: blur(16px) brightness(0.45) saturate(1.1);
+    transform: scale(1.04);
+  }
+  body.form-active .label {
+    opacity: 0.1;
+    transform: scale(0.92);
+  }
+
+  /* ---------- Indicador de scroll ---------- */
+  .scroll-cue {
+    position: absolute;
+    left: 50%;
+    bottom: 42px;
+    transform: translateX(-50%);
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 8px;
+    color: rgba(240,244,255,0.55);
+    font-size: 11px;
+    letter-spacing: 0.24em;
+    text-transform: uppercase;
+    transition: opacity 0.4s ease;
+  }
+  .scroll-cue svg {
+    animation: bob 1.8s ease-in-out infinite;
+  }
+  @keyframes bob {
+    0%, 100% { transform: translateY(0); opacity: 0.5; }
+    50% { transform: translateY(8px); opacity: 1; }
+  }
+  body.form-active .scroll-cue { opacity: 0; }
+
+  /* ---------- Conteúdo com scroll real ---------- */
+  .content {
+    position: relative;
+    z-index: 1;
+  }
+  .spacer {
+    height: 100vh;
+  }
+
+  section.form-section {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 40px 20px;
+  }
+
+  .mini-form {
+    width: 100%;
+    max-width: 400px;
+    background: rgba(20, 23, 30, 0.55);
+    border: 1px solid rgba(255,255,255,0.09);
+    border-radius: 18px;
+    padding: 32px 28px;
+    backdrop-filter: blur(6px);
+    box-shadow: 0 30px 80px -20px rgba(0,0,0,0.7);
+    opacity: 0;
+    transform: translateY(36px) scale(0.98);
+    transition: opacity 0.6s ease, transform 0.6s ease;
+  }
+  .mini-form.visible {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+
+  .mini-form .eyebrow {
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.2em;
+    text-transform: uppercase;
+    color: #ff5590;
+    margin: 0 0 8px;
+  }
+  .mini-form h2 {
+    margin: 0 0 22px;
+    font-size: 21px;
+    font-weight: 700;
+    color: #f5f6f9;
+  }
+
+  label {
+    display: block;
+    font-size: 11px;
+    font-weight: 700;
+    letter-spacing: 0.08em;
+    text-transform: uppercase;
+    color: #9399a8;
+    margin-bottom: 8px;
+  }
+
+  .input-wrap { position: relative; }
+
+  input#cnpj {
+    width: 100%;
+    background: rgba(10,12,16,0.7);
+    border: 1.5px solid rgba(255,255,255,0.12);
+    border-radius: 10px;
+    padding: 15px 46px 15px 16px;
+    font-size: 18px;
+    font-weight: 600;
+    letter-spacing: 0.03em;
+    color: #f5f6f9;
+    outline: none;
+    transition: border-color 0.15s ease, box-shadow 0.15s ease;
+  }
+  input#cnpj::placeholder { color: #5a6072; font-weight: 400; }
+  input#cnpj:focus {
+    border-color: #ee1a63;
+    box-shadow: 0 0 0 4px rgba(238,26,99,0.15);
+  }
+  input#cnpj.valid { border-color: #33c98a; }
+  input#cnpj.invalid { border-color: #e2664f; }
+
+  .status-dot {
+    position: absolute;
+    right: 15px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 9px;
+    height: 9px;
+    border-radius: 50%;
+    background: #3a4051;
+    transition: background 0.2s ease, box-shadow 0.2s ease;
+  }
+  .status-dot.valid { background: #33c98a; box-shadow: 0 0 10px rgba(51,201,138,0.6); }
+  .status-dot.invalid { background: #e2664f; box-shadow: 0 0 10px rgba(226,102,79,0.5); }
+
+  .helper {
+    margin-top: 9px;
+    font-size: 12.5px;
+    color: #9399a8;
+    min-height: 16px;
+  }
+  .helper.invalid { color: #e2664f; }
+  .helper.valid { color: #33c98a; }
+
+  button#submit {
+    width: 100%;
+    margin-top: 20px;
+    background: #ee1a63;
+    color: #1a0410;
+    border: none;
+    padding: 15px 20px;
+    border-radius: 10px;
+    font-weight: 800;
+    font-size: 13px;
+    letter-spacing: 0.06em;
+    text-transform: uppercase;
+    cursor: pointer;
+    transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.15s ease;
+  }
+  button#submit:disabled { opacity: 0.35; cursor: not-allowed; }
+  button#submit:not(:disabled):hover {
+    transform: translateY(-1px);
+    box-shadow: 0 12px 26px -8px rgba(238,26,99,0.55);
+  }
+</style>
+</head>
+<body>
+
+<div class="stage">
+  <canvas id="globeCanvas"></canvas>
+  <div class="vignette"></div>
+  <div class="label"><h1>ÍC<span>A</span>RO</h1></div>
+  <div class="scroll-cue">
+    <span>Role para consultar</span>
+    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+  </div>
+</div>
+
+<div class="content">
+  <div class="spacer"></div>
+
+  <section class="form-section" id="formSection">
+    <form class="mini-form" id="miniForm" novalidate>
+      <p class="eyebrow">Projeto ÍCARO</p>
+      <h2>Consultar prestador por CNPJ</h2>
+
+      <label for="cnpj">CNPJ do prestador</label>
+      <div class="input-wrap">
+        <input
+          type="text"
+          id="cnpj"
+          name="cnpj"
+          inputmode="numeric"
+          autocomplete="off"
+          placeholder="00.000.000/0000-00"
+          maxlength="18"
+          aria-describedby="cnpjHelper"
+        >
+        <span class="status-dot" id="statusDot"></span>
+      </div>
+      <p class="helper" id="cnpjHelper">Digite apenas os números — a formatação é automática.</p>
+
+      <button type="submit" id="submit" disabled>Buscar prestador</button>
+    </form>
+  </section>
+</div>
+
+<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script>
+(function () {
+  const canvas = document.getElementById('globeCanvas');
+  const scene = new THREE.Scene();
+
+  const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
+  camera.position.set(0, 0, 9.5);
+
+  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
+  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  renderer.setSize(window.innerWidth, window.innerHeight);
+
+  const globeGroup = new THREE.Group();
+  scene.add(globeGroup);
+
+  const RADIUS = 3.2;
+  const ACCENT = 0xee1a63;
+  const CYAN = 0x2fd8e0;
+
+  const wireGeo = new THREE.SphereGeometry(RADIUS, 32, 24);
+  const wireMat = new THREE.MeshBasicMaterial({ color: 0x2a3550, wireframe: true, transparent: true, opacity: 0.35 });
+  globeGroup.add(new THREE.Mesh(wireGeo, wireMat));
+
+  const coreGeo = new THREE.SphereGeometry(RADIUS - 0.02, 48, 32);
+  const coreMat = new THREE.MeshPhongMaterial({ color: 0x070a12, emissive: 0x060810, shininess: 4, transparent: true, opacity: 0.92 });
+  globeGroup.add(new THREE.Mesh(coreGeo, coreMat));
+
+  const NUM_POINTS = 1400;
+  const pointPositions = [];
+  const pointVectors = [];
+  const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+
+  for (let i = 0; i < NUM_POINTS; i++) {
+    const y = 1 - (i / (NUM_POINTS - 1)) * 2;
+    const radiusAtY = Math.sqrt(1 - y * y);
+    const theta = goldenAngle * i;
+    const x = Math.cos(theta) * radiusAtY;
+    const z = Math.sin(theta) * radiusAtY;
+    const v = new THREE.Vector3(x, y, z).multiplyScalar(RADIUS + 0.015);
+    pointVectors.push(v);
+    pointPositions.push(v.x, v.y, v.z);
+  }
+
+  const pointsGeo = new THREE.BufferGeometry();
+  pointsGeo.setAttribute('position', new THREE.Float32BufferAttribute(pointPositions, 3));
+  const pointsMat = new THREE.PointsMaterial({ color: CYAN, size: 0.028, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
+  globeGroup.add(new THREE.Points(pointsGeo, pointsMat));
+
+  const arcsGroup = new THREE.Group();
+  globeGroup.add(arcsGroup);
+
+  function randomSurfacePoint() {
+    return pointVectors[Math.floor(Math.random() * pointVectors.length)].clone();
+  }
+
+  function makeArc(pA, pB, color) {
+    const mid = pA.clone().add(pB).multiplyScalar(0.5);
+    const liftFactor = 1 + pA.distanceTo(pB) / (RADIUS * 2.4);
+    mid.setLength(RADIUS * liftFactor);
+    const curve = new THREE.QuadraticBezierCurve3(pA, mid, pB);
+    const points = curve.getPoints(48);
+    const geo = new THREE.BufferGeometry().setFromPoints(points);
+    const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0, blending: THREE.AdditiveBlending });
+    const line = new THREE.Line(geo, mat);
+    line.userData = { life: 0, duration: 3 + Math.random() * 2, fadeIn: 0.7, fadeOut: 1.2 };
+    return line;
+  }
+
+  const MAX_ARCS = 10;
+  function spawnArc() {
+    if (arcsGroup.children.length >= MAX_ARCS) return;
+    const a = randomSurfacePoint();
+    const b = randomSurfacePoint();
+    if (a.distanceTo(b) < RADIUS * 0.6) return;
+    const color = Math.random() > 0.5 ? ACCENT : CYAN;
+    arcsGroup.add(makeArc(a, b, color));
+  }
+  for (let i = 0; i < 5; i++) spawnArc();
+  setInterval(spawnArc, 650);
+
+  const haloGeo = new THREE.SphereGeometry(RADIUS * 1.12, 48, 32);
+  const haloMat = new THREE.ShaderMaterial({
+    transparent: true,
+    depthWrite: false,
+    blending: THREE.AdditiveBlending,
+    uniforms: { glowColor: { value: new THREE.Color(0x1c4d66) } },
+    vertexShader: `
+      varying vec3 vNormal;
+      void main() {
+        vNormal = normalize(normalMatrix * normal);
+        gl_Position = projectionMatrix * modelViewMatrix * vec4(position, 1.0);
+      }
+    `,
+    fragmentShader: `
+      varying vec3 vNormal;
+      uniform vec3 glowColor;
+      void main() {
+        float intensity = pow(0.62 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 3.0);
+        gl_FragColor = vec4(glowColor, intensity * 0.9);
+      }
+    `
+  });
+  scene.add(new THREE.Mesh(haloGeo, haloMat));
+
+  const starGeo = new THREE.BufferGeometry();
+  const starCount = 900;
+  const starPos = [];
+  for (let i = 0; i < starCount; i++) {
+    const r = 30 + Math.random() * 40;
+    const theta = Math.random() * Math.PI * 2;
+    const phi = Math.acos((Math.random() * 2) - 1);
+    starPos.push(r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi));
+  }
+  starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
+  const starMat = new THREE.PointsMaterial({ color: 0xaab4cc, size: 0.05, transparent: true, opacity: 0.5 });
+  scene.add(new THREE.Points(starGeo, starMat));
+
+  scene.add(new THREE.AmbientLight(0x30405a, 1.2));
+  const pLight = new THREE.PointLight(0x5588ff, 1.4, 30);
+  pLight.position.set(6, 4, 8);
+  scene.add(pLight);
+
+  window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
+  });
+
+  const clock = new THREE.Clock();
+  function animate() {
+    requestAnimationFrame(animate);
+    const dt = clock.getDelta();
+    globeGroup.rotation.y += dt * 0.12;
+
+    for (let i = arcsGroup.children.length - 1; i >= 0; i--) {
+      const line = arcsGroup.children[i];
+      const d = line.userData;
+      d.life += dt;
+      if (d.life < d.fadeIn) {
+        line.material.opacity = (d.life / d.fadeIn) * 0.85;
+      } else if (d.life < d.duration - d.fadeOut) {
+        line.material.opacity = 0.85;
+      } else if (d.life < d.duration) {
+        const t = (d.duration - d.life) / d.fadeOut;
+        line.material.opacity = Math.max(t, 0) * 0.85;
+      } else {
+        arcsGroup.remove(line);
+        line.geometry.dispose();
+        line.material.dispose();
+      }
+    }
+    renderer.render(scene, camera);
+  }
+  animate();
+})();
+
+// ---------- Revelação do mini formulário + blur do fundo ao rolar ----------
+(function () {
+  const formSection = document.getElementById('formSection');
+  const miniForm = document.getElementById('miniForm');
+
+  const observer = new IntersectionObserver((entries) => {
+    entries.forEach((entry) => {
+      if (entry.isIntersecting && entry.intersectionRatio > 0.35) {
+        document.body.classList.add('form-active');
+        miniForm.classList.add('visible');
+      } else {
+        document.body.classList.remove('form-active');
+        miniForm.classList.remove('visible');
+      }
+    });
+  }, { threshold: [0, 0.35, 1] });
+
+  observer.observe(formSection);
+})();
+
+// ---------- Validação de CNPJ ----------
+(function () {
+  const input = document.getElementById('cnpj');
+  const dot = document.getElementById('statusDot');
+  const helper = document.getElementById('cnpjHelper');
+  const btn = document.getElementById('submit');
+  const form = document.getElementById('miniForm');
+
+  function onlyDigits(v) { return v.replace(/\D/g, '').slice(0, 14); }
+
+  function maskCNPJ(digits) {
+    let out = digits;
+    out = out.replace(/^(\d{2})(\d)/, '$1.$2');
+    out = out.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
+    out = out.replace(/(\d{3})(\d{1,4})$/, '$1/$2');
+    out = out.replace(/(\d{4})(\d{1,2})$/, '$1-$2');
+    return out;
+  }
+
+  // Algoritmo oficial de validação de CNPJ (dígitos verificadores, módulo 11)
+  function isValidCNPJ(digits) {
+    if (digits.length !== 14) return false;
+    if (/^(\d)\1{13}$/.test(digits)) return false; // todos os dígitos iguais são inválidos
+
+    const calcDigit = (base) => {
+      const weights = base.length === 12
+        ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
+        : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
+      let sum = 0;
+      for (let i = 0; i < base.length; i++) sum += parseInt(base[i], 10) * weights[i];
+      const rest = sum % 11;
+      return rest < 2 ? 0 : 11 - rest;
+    };
+
+    const base12 = digits.slice(0, 12);
+    const dv1 = calcDigit(base12);
+    const base13 = base12 + dv1;
+    const dv2 = calcDigit(base13);
+
+    return digits === base13 + dv2;
+  }
+
+  input.addEventListener('input', () => {
+    const digits = onlyDigits(input.value);
+    input.value = maskCNPJ(digits);
+
+    input.classList.remove('valid', 'invalid');
+    dot.classList.remove('valid', 'invalid');
+
+    if (digits.length === 0) {
+      helper.textContent = 'Digite apenas os números — a formatação é automática.';
+      helper.className = 'helper';
+      btn.disabled = true;
+      return;
+    }
+    if (digits.length < 14) {
+      helper.textContent = 'Continue digitando: faltam ' + (14 - digits.length) + ' dígito(s).';
+      helper.className = 'helper';
+      btn.disabled = true;
+      return;
+    }
+    if (isValidCNPJ(digits)) {
+      input.classList.add('valid');
+      dot.classList.add('valid');
+      helper.textContent = 'CNPJ válido. Pronto para iniciar a busca.';
+      helper.className = 'helper valid';
+      btn.disabled = false;
+    } else {
+      input.classList.add('invalid');
+      dot.classList.add('invalid');
+      helper.textContent = 'Este CNPJ não é válido. Confira os números digitados.';
+      helper.className = 'helper invalid';
+      btn.disabled = true;
+    }
+  });
+
+  form.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const digits = onlyDigits(input.value);
+    if (!isValidCNPJ(digits)) return;
+    console.log('CNPJ capturado pelo ÍCARO:', digits);
+    alert('CNPJ capturado: ' + digits + '\n\n(Próxima fase: o Ícaro inicia as buscas a partir daqui.)');
+  });
+})();
+</script>
+
+</body>
+</html>
