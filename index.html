@@ -1,461 +1,580 @@
 <!DOCTYPE html>
-<html lang="pt-BR">
+<html lang="pt-br">
 <head>
 <meta charset="UTF-8">
-<meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>ÍCARO</title>
 <style>
-  * { box-sizing: border-box; }
-
-  html {
-    scroll-behavior: smooth;
+  * {
+    box-sizing: border-box;
   }
-
   html, body {
     margin: 0;
     padding: 0;
     width: 100%;
-    background: #05070c;
-    font-family: 'Segoe UI', Arial, sans-serif;
+    height: 100%;
+    background: #000005;
+    overflow: hidden;
+    font-family: 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+  }
+  canvas {
+    display: block;
   }
 
-  /* ---------- Palco fixo: globo + label, sempre no fundo ---------- */
-  .stage {
+  /* ============ OVERLAY CENTRAL ============ */
+  #overlay {
     position: fixed;
     inset: 0;
-    z-index: 0;
-  }
-
-  #globeCanvas {
-    position: absolute;
-    inset: 0;
-    display: block;
-    transition: filter 0.6s ease, transform 0.6s ease;
-  }
-
-  .vignette {
-    position: absolute;
-    inset: 0;
-    pointer-events: none;
-    background:
-      radial-gradient(ellipse at center, rgba(5,7,12,0) 30%, rgba(5,7,12,0.55) 78%, rgba(5,7,12,0.96) 100%);
-  }
-
-  .label {
-    position: absolute;
-    inset: 0;
     display: flex;
     align-items: center;
     justify-content: center;
-    pointer-events: none;
-    transition: opacity 0.6s ease, transform 0.6s ease;
-  }
-  .label h1 {
-    margin: 0;
-    font-size: clamp(72px, 17vw, 260px);
-    font-weight: 800;
-    letter-spacing: 0.06em;
-    color: rgba(240,244,255,0.94);
-    text-shadow: 0 0 60px rgba(238,26,99,0.35), 0 0 120px rgba(47,216,224,0.15);
-  }
-  .label h1 span { color: #ee1a63; }
-
-  body.form-active #globeCanvas {
-    filter: blur(16px) brightness(0.45) saturate(1.1);
-    transform: scale(1.04);
-  }
-  body.form-active .label {
-    opacity: 0.1;
-    transform: scale(0.92);
+    pointer-events: none; /* deixa o globo "respirar" atrás, só o card recebe clique */
   }
 
-  /* ---------- Indicador de scroll ---------- */
-  .scroll-cue {
-    position: absolute;
-    left: 50%;
-    bottom: 42px;
-    transform: translateX(-50%);
+  #card {
+    pointer-events: auto;
+    width: min(90vw, 460px);
+    max-height: 86vh;
+    overflow-y: auto;
+    padding: 40px 36px 34px;
+    border-radius: 18px;
+    background: rgba(8, 16, 28, 0.55);
+    border: 1px solid rgba(127, 196, 255, 0.25);
+    backdrop-filter: blur(14px);
+    -webkit-backdrop-filter: blur(14px);
+    box-shadow:
+      0 0 40px rgba(58, 123, 213, 0.15),
+      0 20px 60px rgba(0, 0, 0, 0.5),
+      inset 0 1px 0 rgba(255, 255, 255, 0.05);
+    text-align: center;
+    scrollbar-width: thin;
+    scrollbar-color: rgba(127, 196, 255, 0.35) transparent;
+  }
+
+  #card::-webkit-scrollbar {
+    width: 6px;
+  }
+  #card::-webkit-scrollbar-thumb {
+    background: rgba(127, 196, 255, 0.35);
+    border-radius: 3px;
+  }
+
+  #logo {
+    font-size: 34px;
+    font-weight: 700;
+    letter-spacing: 6px;
+    color: #eaf6ff;
+    margin: 0 0 4px;
+    text-shadow: 0 0 18px rgba(127, 196, 255, 0.55);
+  }
+
+  #subtitle {
+    font-size: 12.5px;
+    letter-spacing: 1.5px;
+    color: #7fa8c9;
+    margin: 0 0 30px;
+    text-transform: uppercase;
+  }
+
+  #cnpj-label {
+    display: block;
+    text-align: left;
+    font-size: 12.5px;
+    color: #9fc3dd;
+    margin-bottom: 8px;
+    letter-spacing: 0.5px;
+  }
+
+  #cnpj-input {
+    width: 100%;
+    padding: 13px 14px;
+    font-size: 16px;
+    letter-spacing: 0.5px;
+    border-radius: 10px;
+    border: 1px solid rgba(127, 196, 255, 0.3);
+    background: rgba(255, 255, 255, 0.04);
+    color: #eaf6ff;
+    outline: none;
+    transition: border-color 0.25s ease, box-shadow 0.25s ease;
+  }
+
+  #cnpj-input::placeholder {
+    color: rgba(200, 225, 245, 0.35);
+  }
+
+  #cnpj-input:focus {
+    border-color: rgba(127, 196, 255, 0.7);
+    box-shadow: 0 0 0 3px rgba(58, 123, 213, 0.2);
+  }
+
+  #cnpj-input.invalid {
+    border-color: rgba(255, 99, 99, 0.6);
+  }
+
+  #cnpj-input.valid {
+    border-color: rgba(110, 230, 180, 0.7);
+  }
+
+  #feedback {
+    min-height: 18px;
+    font-size: 12px;
+    margin-top: 8px;
+    text-align: left;
+    color: rgba(255, 120, 120, 0.85);
+    transition: color 0.2s ease;
+  }
+
+  #feedback.ok {
+    color: rgba(110, 230, 180, 0.85);
+  }
+
+  #search-btn {
+    width: 100%;
+    margin-top: 22px;
+    padding: 13px 14px;
+    font-size: 14.5px;
+    font-weight: 600;
+    letter-spacing: 1px;
+    text-transform: uppercase;
+    border-radius: 10px;
+    border: none;
+    cursor: not-allowed;
+    color: rgba(255, 255, 255, 0.35);
+    background: rgba(255, 255, 255, 0.06);
+    transition: all 0.3s ease;
+  }
+
+  #search-btn.enabled {
+    cursor: pointer;
+    color: #04141f;
+    background: linear-gradient(135deg, #7fc4ff, #3a7bd5);
+    box-shadow: 0 0 22px rgba(58, 123, 213, 0.55);
+  }
+
+  #search-btn.enabled:hover {
+    filter: brightness(1.08);
+    box-shadow: 0 0 30px rgba(58, 123, 213, 0.75);
+  }
+
+  #search-btn.enabled:active {
+    transform: scale(0.98);
+  }
+
+  /* ============ RESULTADOS ============ */
+  #results {
+    margin-top: 26px;
+    text-align: left;
+    display: none;
+  }
+
+  #results.visible {
+    display: block;
+  }
+
+  #loading {
+    display: none;
+    align-items: center;
+    gap: 10px;
+    margin-top: 22px;
+    font-size: 13px;
+    color: #9fc3dd;
+  }
+
+  #loading.visible {
     display: flex;
-    flex-direction: column;
+  }
+
+  .spinner {
+    width: 16px;
+    height: 16px;
+    border-radius: 50%;
+    border: 2px solid rgba(127, 196, 255, 0.25);
+    border-top-color: #7fc4ff;
+    animation: spin 0.8s linear infinite;
+  }
+
+  @keyframes spin {
+    to { transform: rotate(360deg); }
+  }
+
+  .source-block {
+    margin-bottom: 18px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(127, 196, 255, 0.15);
+  }
+
+  .source-block:last-child {
+    margin-bottom: 0;
+  }
+
+  .source-title {
+    font-size: 11px;
+    letter-spacing: 1.2px;
+    text-transform: uppercase;
+    color: #7fc4ff;
+    margin: 0 0 10px;
+  }
+
+  .source-title.error {
+    color: rgba(255, 120, 120, 0.85);
+  }
+
+  .data-row {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 13px;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .data-row:last-child {
+    border-bottom: none;
+  }
+
+  .data-label {
+    color: #8fb3d1;
+    white-space: nowrap;
+  }
+
+  .data-value {
+    color: #eaf6ff;
+    text-align: right;
+    word-break: break-word;
+  }
+
+  .error-text {
+    font-size: 12.5px;
+    color: rgba(255, 150, 150, 0.85);
+  }
+
+  /* ============ BLOCO GOOGLE MAPS ============ */
+  .google-block {
+    margin-top: 18px;
+    padding: 14px 16px;
+    border-radius: 12px;
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px solid rgba(127, 196, 255, 0.15);
+  }
+
+  .google-match {
+    font-size: 11.5px;
+    color: #7a94a8;
+    margin: -8px 0 14px;
+  }
+
+  .rating-row {
+    display: flex;
     align-items: center;
     gap: 8px;
-    color: rgba(240,244,255,0.55);
+    margin-bottom: 14px;
+  }
+
+  .rating-score {
+    font-size: 22px;
+    font-weight: 700;
+    color: #ffd76a;
+  }
+
+  .rating-count {
+    font-size: 12.5px;
+    color: #8fb3d1;
+  }
+
+  .open-badge {
     font-size: 11px;
-    letter-spacing: 0.24em;
+    font-weight: 600;
+    padding: 3px 10px;
+    border-radius: 20px;
+    margin-left: auto;
+  }
+
+  .open-badge.open {
+    background: rgba(110, 230, 180, 0.15);
+    color: rgba(110, 230, 180, 0.9);
+  }
+
+  .open-badge.closed {
+    background: rgba(255, 120, 120, 0.15);
+    color: rgba(255, 120, 120, 0.9);
+  }
+
+  .hours-title {
+    font-size: 11px;
+    letter-spacing: 0.8px;
     text-transform: uppercase;
-    transition: opacity 0.4s ease;
-  }
-  .scroll-cue svg {
-    animation: bob 1.8s ease-in-out infinite;
-  }
-  @keyframes bob {
-    0%, 100% { transform: translateY(0); opacity: 0.5; }
-    50% { transform: translateY(8px); opacity: 1; }
-  }
-  body.form-active .scroll-cue { opacity: 0; }
-
-  /* ---------- Conteúdo com scroll real ---------- */
-  .content {
-    position: relative;
-    z-index: 1;
-  }
-  .spacer {
-    height: 100vh;
+    color: #8fb3d1;
+    margin: 0 0 6px;
   }
 
-  section.form-section {
-    min-height: 100vh;
+  .hours-list {
+    margin: 0 0 4px;
+    padding: 0;
+    list-style: none;
+  }
+
+  .hours-list li {
+    display: flex;
+    justify-content: space-between;
+    gap: 12px;
+    font-size: 12.5px;
+    padding: 5px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+  }
+
+  .hours-list li:last-child {
+    border-bottom: none;
+  }
+
+  .hours-list .day-name {
+    color: #b9d7ef;
+    text-transform: capitalize;
+    white-space: nowrap;
+  }
+
+  .hours-list .day-hours {
+    color: #ffffff;
+    font-weight: 500;
+    text-align: right;
+  }
+
+  .hours-list li.today .day-name,
+  .hours-list li.today .day-hours {
+    color: #7fc4ff;
+    font-weight: 600;
+  }
+
+  .hours-list .closed-text {
+    color: rgba(255, 150, 150, 0.75);
+  }
+
+  .transport-title {
+    font-size: 11px;
+    letter-spacing: 0.8px;
+    text-transform: uppercase;
+    color: #8fb3d1;
+    margin: 14px 0 8px;
+  }
+
+  .transport-row {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+
+  .transport-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    padding: 6px 11px;
+    border-radius: 20px;
+    background: rgba(127, 196, 255, 0.08);
+    border: 1px solid rgba(127, 196, 255, 0.18);
+    color: #cfe3f2;
+  }
+
+  .transport-badge .count {
+    font-weight: 700;
+    color: #eaf6ff;
+  }
+
+  .accessibility-badge {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    font-size: 12px;
+    padding: 6px 11px;
+    border-radius: 20px;
+    background: rgba(127, 196, 255, 0.08);
+    border: 1px solid rgba(127, 196, 255, 0.18);
+    color: #cfe3f2;
+  }
+
+  .accessibility-badge.yes {
+    color: rgba(110, 230, 180, 0.9);
+    border-color: rgba(110, 230, 180, 0.3);
+  }
+
+  .accessibility-badge.no {
+    color: rgba(255, 150, 150, 0.85);
+    border-color: rgba(255, 120, 120, 0.25);
+  }
+
+  .accessibility-badge.unknown {
+    color: #7a94a8;
+  }
+
+  .photos-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(120px, 1fr));
+    gap: 10px;
+    margin-top: 12px;
+  }
+
+  .photo-card {
+    display: flex;
+    flex-direction: column;
+    gap: 5px;
+  }
+
+  .photo-card a {
+    display: block;
+  }
+
+  .photo-card img {
+    width: 100%;
+    height: 90px;
+    object-fit: cover;
+    border-radius: 8px;
+    border: 1px solid rgba(127, 196, 255, 0.2);
+    cursor: pointer;
+    transition: transform 0.15s ease, border-color 0.15s ease;
+  }
+
+  .photo-card img:hover {
+    transform: scale(1.03);
+    border-color: rgba(127, 196, 255, 0.5);
+  }
+
+  .photo-error {
     display: flex;
     align-items: center;
     justify-content: center;
-    padding: 40px 20px;
-  }
-
-  .mini-form {
+    height: 90px;
     width: 100%;
-    max-width: 400px;
-    background: rgba(20, 23, 30, 0.55);
-    border: 1px solid rgba(255,255,255,0.09);
-    border-radius: 18px;
-    padding: 32px 28px;
-    backdrop-filter: blur(6px);
-    box-shadow: 0 30px 80px -20px rgba(0,0,0,0.7);
-    opacity: 0;
-    transform: translateY(36px) scale(0.98);
-    transition: opacity 0.6s ease, transform 0.6s ease;
-  }
-  .mini-form.visible {
-    opacity: 1;
-    transform: translateY(0) scale(1);
-  }
-
-  .mini-form .eyebrow {
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.2em;
-    text-transform: uppercase;
-    color: #ff5590;
-    margin: 0 0 8px;
-  }
-  .mini-form h2 {
-    margin: 0 0 22px;
-    font-size: 21px;
-    font-weight: 700;
-    color: #f5f6f9;
-  }
-
-  label {
-    display: block;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: #9399a8;
-    margin-bottom: 8px;
-  }
-
-  .input-wrap { position: relative; }
-
-  input#cnpj {
-    width: 100%;
-    background: rgba(10,12,16,0.7);
-    border: 1.5px solid rgba(255,255,255,0.12);
-    border-radius: 10px;
-    padding: 15px 46px 15px 16px;
-    font-size: 18px;
-    font-weight: 600;
-    letter-spacing: 0.03em;
-    color: #f5f6f9;
-    outline: none;
-    transition: border-color 0.15s ease, box-shadow 0.15s ease;
-  }
-  input#cnpj::placeholder { color: #5a6072; font-weight: 400; }
-  input#cnpj:focus {
-    border-color: #ee1a63;
-    box-shadow: 0 0 0 4px rgba(238,26,99,0.15);
-  }
-  input#cnpj.valid { border-color: #33c98a; }
-  input#cnpj.invalid { border-color: #e2664f; }
-
-  .status-dot {
-    position: absolute;
-    right: 15px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 9px;
-    height: 9px;
-    border-radius: 50%;
-    background: #3a4051;
-    transition: background 0.2s ease, box-shadow 0.2s ease;
-  }
-  .status-dot.valid { background: #33c98a; box-shadow: 0 0 10px rgba(51,201,138,0.6); }
-  .status-dot.invalid { background: #e2664f; box-shadow: 0 0 10px rgba(226,102,79,0.5); }
-
-  .helper {
-    margin-top: 9px;
-    font-size: 12.5px;
-    color: #9399a8;
-    min-height: 16px;
-  }
-  .helper.invalid { color: #e2664f; }
-  .helper.valid { color: #33c98a; }
-
-  button#submit {
-    width: 100%;
-    margin-top: 20px;
-    background: #ee1a63;
-    color: #1a0410;
-    border: none;
-    padding: 15px 20px;
-    border-radius: 10px;
-    font-weight: 800;
-    font-size: 13px;
-    letter-spacing: 0.06em;
-    text-transform: uppercase;
-    cursor: pointer;
-    transition: transform 0.12s ease, box-shadow 0.12s ease, opacity 0.15s ease;
-  }
-  button#submit:disabled { opacity: 0.35; cursor: not-allowed; }
-  button#submit:not(:disabled):hover {
-    transform: translateY(-1px);
-    box-shadow: 0 12px 26px -8px rgba(238,26,99,0.55);
-  }
-  button#submit .spinner {
-    display: inline-block;
-    width: 13px;
-    height: 13px;
-    border-radius: 50%;
-    border: 2px solid rgba(26,4,16,0.3);
-    border-top-color: #1a0410;
-    animation: spin 0.7s linear infinite;
-    vertical-align: -2px;
-    margin-right: 8px;
-  }
-  @keyframes spin { to { transform: rotate(360deg); } }
-
-  /* ---------- Resultado da busca ---------- */
-  #result {
-    margin-top: 22px;
-    max-height: 0;
-    overflow: hidden;
-    opacity: 0;
-    transition: max-height 0.5s ease, opacity 0.4s ease, margin-top 0.4s ease;
-  }
-  #result.show {
-    max-height: 2200px;
-    opacity: 1;
-  }
-
-  .result-card {
-    border-top: 1px solid rgba(255,255,255,0.1);
-    padding-top: 18px;
-  }
-
-  .result-name {
-    font-size: 14px;
-    font-weight: 700;
-    color: #f5f6f9;
-    margin: 0 0 3px;
-  }
-  .result-status {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    font-size: 11px;
-    font-weight: 700;
-    letter-spacing: 0.05em;
-    text-transform: uppercase;
-    color: #33c98a;
-    margin: 0 0 16px;
-  }
-  .result-status.inactive { color: #e2664f; }
-  .result-status .dot {
-    width: 6px; height: 6px; border-radius: 50%; background: currentColor;
-  }
-
-  .result-row {
-    display: flex;
-    gap: 12px;
-    margin-bottom: 14px;
-  }
-  .result-row svg { flex: none; margin-top: 2px; }
-  .result-row .rl {
     font-size: 10.5px;
-    font-weight: 700;
-    letter-spacing: 0.08em;
-    text-transform: uppercase;
-    color: #6a7185;
-    margin: 0 0 3px;
+    text-align: center;
+    color: rgba(255, 150, 150, 0.85);
+    background: rgba(255, 255, 255, 0.03);
+    border: 1px dashed rgba(255, 120, 120, 0.3);
+    border-radius: 8px;
+    padding: 4px;
   }
-  .result-row .rv {
-    font-size: 13.5px;
-    color: #dfe3ec;
-    line-height: 1.45;
+
+  .photo-tag {
+    align-self: flex-start;
+    font-size: 10px;
+    font-weight: 600;
+    padding: 2px 8px;
+    border-radius: 20px;
+    background: rgba(127, 196, 255, 0.12);
+    color: #7fc4ff;
+  }
+
+  .photo-caption {
+    font-size: 11px;
+    color: #b9d7ef;
+    line-height: 1.4;
     margin: 0;
-  }
-  .result-row .rv.muted { color: #6a7185; font-style: italic; }
-
-  .result-list {
-    list-style: none;
-    margin: 0;
-    padding: 0;
-  }
-  .result-list li {
-    font-size: 13.5px;
-    color: #dfe3ec;
-    line-height: 1.5;
-    padding: 2px 0;
-  }
-  .result-list li .sub {
-    color: #6a7185;
-    font-size: 12px;
-  }
-
-  .result-divider {
-    border: none;
-    border-top: 1px solid rgba(255,255,255,0.08);
-    margin: 16px 0;
-  }
-
-  .result-error {
-    font-size: 13px;
-    color: #e2664f;
-    line-height: 1.5;
-    padding-top: 18px;
-    border-top: 1px solid rgba(255,255,255,0.1);
   }
 </style>
 </head>
 <body>
 
-<div class="stage">
-  <canvas id="globeCanvas"></canvas>
-  <div class="vignette"></div>
-  <div class="label"><h1>ÍC<span>A</span>RO</h1></div>
-  <div class="scroll-cue">
-    <span>Role para consultar</span>
-    <svg width="18" height="18" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2"><path d="M6 9l6 6 6-6"/></svg>
+<div id="overlay">
+  <div id="card">
+    <p id="logo">ÍCARO</p>
+    <p id="subtitle">Score do Prestador</p>
+
+    <label id="cnpj-label" for="cnpj-input">CNPJ</label>
+    <input
+      id="cnpj-input"
+      type="text"
+      inputmode="numeric"
+      placeholder="00.000.000/0000-00"
+      maxlength="18"
+      autocomplete="off"
+    />
+    <div id="feedback"></div>
+
+    <button id="search-btn" type="button" disabled>Buscar</button>
+
+    <div id="loading">
+      <div class="spinner"></div>
+      <span>Consultando bases de dados...</span>
+    </div>
+
+    <div id="results"></div>
   </div>
 </div>
 
-<div class="content">
-  <div class="spacer"></div>
-
-  <section class="form-section" id="formSection">
-    <form class="mini-form" id="miniForm" novalidate>
-      <p class="eyebrow">Projeto ÍCARO</p>
-      <h2>Consultar prestador por CNPJ</h2>
-
-      <label for="cnpj">CNPJ do prestador</label>
-      <div class="input-wrap">
-        <input
-          type="text"
-          id="cnpj"
-          name="cnpj"
-          inputmode="numeric"
-          autocomplete="off"
-          placeholder="00.000.000/0000-00"
-          maxlength="18"
-          aria-describedby="cnpjHelper"
-        >
-        <span class="status-dot" id="statusDot"></span>
-      </div>
-      <p class="helper" id="cnpjHelper">Digite apenas os números — a formatação é automática.</p>
-
-      <button type="submit" id="submit" disabled>Buscar prestador</button>
-
-      <div id="result"></div>
-    </form>
-  </section>
-</div>
-
-<script src="https://cdnjs.cloudflare.com/ajax/libs/three.js/r128/three.min.js"></script>
+<script src="https://unpkg.com/three@0.150.1/build/three.min.js"></script>
 <script>
-(function () {
-  const canvas = document.getElementById('globeCanvas');
+  // ============ CENA / CÂMERA / RENDER ============
   const scene = new THREE.Scene();
+  const camera = new THREE.PerspectiveCamera(
+    45,
+    window.innerWidth / window.innerHeight,
+    0.1,
+    1000
+  );
+  camera.position.z = 3.2;
 
-  const camera = new THREE.PerspectiveCamera(45, window.innerWidth / window.innerHeight, 0.1, 100);
-  camera.position.set(0, 0, 9.5);
-
-  const renderer = new THREE.WebGLRenderer({ canvas, antialias: true, alpha: true });
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
+  const renderer = new THREE.WebGLRenderer({ antialias: true, alpha: true });
   renderer.setSize(window.innerWidth, window.innerHeight);
+  renderer.setPixelRatio(window.devicePixelRatio);
+  document.body.appendChild(renderer.domElement);
 
-  const globeGroup = new THREE.Group();
-  scene.add(globeGroup);
+  const EARTH_RADIUS = 1;
 
-  const RADIUS = 3.2;
-  const ACCENT = 0xee1a63;
-  const CYAN = 0x2fd8e0;
+  // ============ LUZES ============
+  const sunLight = new THREE.DirectionalLight(0xffffff, 1.4);
+  sunLight.position.set(5, 2, 4);
+  scene.add(sunLight);
+  scene.add(new THREE.AmbientLight(0x223344, 0.9));
 
-  const wireGeo = new THREE.SphereGeometry(RADIUS, 32, 24);
-  const wireMat = new THREE.MeshBasicMaterial({ color: 0x2a3550, wireframe: true, transparent: true, opacity: 0.35 });
-  globeGroup.add(new THREE.Mesh(wireGeo, wireMat));
+  // ============ GRUPO DO MUNDO ============
+  const worldGroup = new THREE.Group();
+  worldGroup.rotation.z = THREE.MathUtils.degToRad(-8);
+  scene.add(worldGroup);
 
-  const coreGeo = new THREE.SphereGeometry(RADIUS - 0.02, 48, 32);
-  const coreMat = new THREE.MeshPhongMaterial({ color: 0x070a12, emissive: 0x060810, shininess: 4, transparent: true, opacity: 0.92 });
-  globeGroup.add(new THREE.Mesh(coreGeo, coreMat));
+  // ============ TEXTURAS REALISTAS ============
+  const loader = new THREE.TextureLoader();
+  const base = "https://threejs.org/examples/textures/planets/";
+  const earthMap    = loader.load(base + "earth_atmos_2048.jpg");
+  const earthNormal = loader.load(base + "earth_normal_2048.jpg");
+  const earthSpec   = loader.load(base + "earth_specular_2048.jpg");
+  const cloudsMap   = loader.load(base + "earth_clouds_1024.png");
+  const lightsMap   = loader.load(base + "earth_lights_2048.png");
 
-  const NUM_POINTS = 1400;
-  const pointPositions = [];
-  const pointVectors = [];
-  const goldenAngle = Math.PI * (3 - Math.sqrt(5));
+  // ============ TERRA ============
+  const earthGeometry = new THREE.SphereGeometry(EARTH_RADIUS, 96, 96);
+  const earthMaterial = new THREE.MeshPhongMaterial({
+    map: earthMap,
+    normalMap: earthNormal,
+    normalScale: new THREE.Vector2(0.8, 0.8),
+    specularMap: earthSpec,
+    specular: new THREE.Color(0x333333),
+    shininess: 15,
+    emissiveMap: lightsMap,
+    emissive: new THREE.Color(0xffcc88),
+    emissiveIntensity: 0.55
+  });
+  const earth = new THREE.Mesh(earthGeometry, earthMaterial);
+  worldGroup.add(earth);
 
-  for (let i = 0; i < NUM_POINTS; i++) {
-    const y = 1 - (i / (NUM_POINTS - 1)) * 2;
-    const radiusAtY = Math.sqrt(1 - y * y);
-    const theta = goldenAngle * i;
-    const x = Math.cos(theta) * radiusAtY;
-    const z = Math.sin(theta) * radiusAtY;
-    const v = new THREE.Vector3(x, y, z).multiplyScalar(RADIUS + 0.015);
-    pointVectors.push(v);
-    pointPositions.push(v.x, v.y, v.z);
-  }
-
-  const pointsGeo = new THREE.BufferGeometry();
-  pointsGeo.setAttribute('position', new THREE.Float32BufferAttribute(pointPositions, 3));
-  const pointsMat = new THREE.PointsMaterial({ color: CYAN, size: 0.028, transparent: true, opacity: 0.85, blending: THREE.AdditiveBlending, depthWrite: false });
-  globeGroup.add(new THREE.Points(pointsGeo, pointsMat));
-
-  const arcsGroup = new THREE.Group();
-  globeGroup.add(arcsGroup);
-
-  function randomSurfacePoint() {
-    return pointVectors[Math.floor(Math.random() * pointVectors.length)].clone();
-  }
-
-  function makeArc(pA, pB, color) {
-    const mid = pA.clone().add(pB).multiplyScalar(0.5);
-    const liftFactor = 1 + pA.distanceTo(pB) / (RADIUS * 2.4);
-    mid.setLength(RADIUS * liftFactor);
-    const curve = new THREE.QuadraticBezierCurve3(pA, mid, pB);
-    const points = curve.getPoints(48);
-    const geo = new THREE.BufferGeometry().setFromPoints(points);
-    const mat = new THREE.LineBasicMaterial({ color, transparent: true, opacity: 0, blending: THREE.AdditiveBlending });
-    const line = new THREE.Line(geo, mat);
-    line.userData = { life: 0, duration: 3 + Math.random() * 2, fadeIn: 0.7, fadeOut: 1.2 };
-    return line;
-  }
-
-  const MAX_ARCS = 10;
-  function spawnArc() {
-    if (arcsGroup.children.length >= MAX_ARCS) return;
-    const a = randomSurfacePoint();
-    const b = randomSurfacePoint();
-    if (a.distanceTo(b) < RADIUS * 0.6) return;
-    const color = Math.random() > 0.5 ? ACCENT : CYAN;
-    arcsGroup.add(makeArc(a, b, color));
-  }
-  for (let i = 0; i < 5; i++) spawnArc();
-  setInterval(spawnArc, 650);
-
-  const haloGeo = new THREE.SphereGeometry(RADIUS * 1.12, 48, 32);
-  const haloMat = new THREE.ShaderMaterial({
+  // ============ NUVENS ============
+  const cloudsGeometry = new THREE.SphereGeometry(EARTH_RADIUS * 1.008, 96, 96);
+  const cloudsMaterial = new THREE.MeshPhongMaterial({
+    map: cloudsMap,
     transparent: true,
-    depthWrite: false,
+    opacity: 0.55,
+    depthWrite: false
+  });
+  const clouds = new THREE.Mesh(cloudsGeometry, cloudsMaterial);
+  worldGroup.add(clouds);
+
+  // ============ ATMOSFERA SUTIL ============
+  const atmosphereGeometry = new THREE.SphereGeometry(EARTH_RADIUS * 1.04, 96, 96);
+  const atmosphereMaterial = new THREE.ShaderMaterial({
+    transparent: true,
+    side: THREE.BackSide,
     blending: THREE.AdditiveBlending,
-    uniforms: { glowColor: { value: new THREE.Color(0x1c4d66) } },
+    uniforms: {
+      glowColor: { value: new THREE.Color(0x3a7bd5) }
+    },
     vertexShader: `
       varying vec3 vNormal;
       void main() {
@@ -467,309 +586,457 @@
       varying vec3 vNormal;
       uniform vec3 glowColor;
       void main() {
-        float intensity = pow(0.62 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 3.0);
+        float intensity = pow(0.7 - dot(vNormal, vec3(0.0, 0.0, 1.0)), 4.0);
         gl_FragColor = vec4(glowColor, intensity * 0.9);
       }
     `
   });
-  scene.add(new THREE.Mesh(haloGeo, haloMat));
+  const atmosphere = new THREE.Mesh(atmosphereGeometry, atmosphereMaterial);
+  scene.add(atmosphere);
 
-  const starGeo = new THREE.BufferGeometry();
-  const starCount = 900;
-  const starPos = [];
-  for (let i = 0; i < starCount; i++) {
-    const r = 30 + Math.random() * 40;
-    const theta = Math.random() * Math.PI * 2;
-    const phi = Math.acos((Math.random() * 2) - 1);
-    starPos.push(r * Math.sin(phi) * Math.cos(theta), r * Math.sin(phi) * Math.sin(theta), r * Math.cos(phi));
+  // ============ ESTRELAS ============
+  function createStars() {
+    const group = new THREE.Group();
+    for (let layer = 0; layer < 3; layer++) {
+      const geo = new THREE.BufferGeometry();
+      const count = 800;
+      const positions = new Float32Array(count * 3);
+      for (let i = 0; i < count; i++) {
+        const r = 40 + Math.random() * 40;
+        const t = Math.random() * Math.PI * 2;
+        const p = Math.acos(2 * Math.random() - 1);
+        positions[i * 3]     = r * Math.sin(p) * Math.cos(t);
+        positions[i * 3 + 1] = r * Math.cos(p);
+        positions[i * 3 + 2] = r * Math.sin(p) * Math.sin(t);
+      }
+      geo.setAttribute("position", new THREE.BufferAttribute(positions, 3));
+      const mat = new THREE.PointsMaterial({
+        color: 0xffffff,
+        size: 0.05 + layer * 0.05,
+        transparent: true,
+        opacity: 0.4 + layer * 0.25
+      });
+      group.add(new THREE.Points(geo, mat));
+    }
+    return group;
   }
-  starGeo.setAttribute('position', new THREE.Float32BufferAttribute(starPos, 3));
-  const starMat = new THREE.PointsMaterial({ color: 0xaab4cc, size: 0.05, transparent: true, opacity: 0.5 });
-  scene.add(new THREE.Points(starGeo, starMat));
+  scene.add(createStars());
 
-  scene.add(new THREE.AmbientLight(0x30405a, 1.2));
-  const pLight = new THREE.PointLight(0x5588ff, 1.4, 30);
-  pLight.position.set(6, 4, 8);
-  scene.add(pLight);
-
-  window.addEventListener('resize', () => {
+  // ============ RESPONSIVIDADE ============
+  window.addEventListener("resize", () => {
     camera.aspect = window.innerWidth / window.innerHeight;
     camera.updateProjectionMatrix();
     renderer.setSize(window.innerWidth, window.innerHeight);
   });
 
-  const clock = new THREE.Clock();
+  // ============ ANIMAÇÃO ============
   function animate() {
     requestAnimationFrame(animate);
-    const dt = clock.getDelta();
-    globeGroup.rotation.y += dt * 0.12;
-
-    for (let i = arcsGroup.children.length - 1; i >= 0; i--) {
-      const line = arcsGroup.children[i];
-      const d = line.userData;
-      d.life += dt;
-      if (d.life < d.fadeIn) {
-        line.material.opacity = (d.life / d.fadeIn) * 0.85;
-      } else if (d.life < d.duration - d.fadeOut) {
-        line.material.opacity = 0.85;
-      } else if (d.life < d.duration) {
-        const t = (d.duration - d.life) / d.fadeOut;
-        line.material.opacity = Math.max(t, 0) * 0.85;
-      } else {
-        arcsGroup.remove(line);
-        line.geometry.dispose();
-        line.material.dispose();
-      }
-    }
+    worldGroup.rotation.y += 0.0012;
+    clouds.rotation.y += 0.0004;
     renderer.render(scene, camera);
   }
   animate();
-})();
+</script>
 
-// ---------- Revelação do mini formulário + blur do fundo ao rolar ----------
-(function () {
-  const formSection = document.getElementById('formSection');
-  const miniForm = document.getElementById('miniForm');
+<script>
+  // ============ FORMULÁRIO DE CNPJ ============
+  const input = document.getElementById("cnpj-input");
+  const feedback = document.getElementById("feedback");
+  const button = document.getElementById("search-btn");
 
-  const observer = new IntersectionObserver((entries) => {
-    entries.forEach((entry) => {
-      if (entry.isIntersecting && entry.intersectionRatio > 0.35) {
-        document.body.classList.add('form-active');
-        miniForm.classList.add('visible');
-      } else {
-        document.body.classList.remove('form-active');
-        miniForm.classList.remove('visible');
-      }
-    });
-  }, { threshold: [0, 0.35, 1] });
+  // aplica a máscara 00.000.000/0000-00 enquanto o usuário digita
+  function maskCNPJ(value) {
+    const digits = value.replace(/\D/g, "").slice(0, 14);
+    let masked = digits;
 
-  observer.observe(formSection);
-})();
+    masked = masked.replace(/^(\d{2})(\d)/, "$1.$2");
+    masked = masked.replace(/^(\d{2})\.(\d{3})(\d)/, "$1.$2.$3");
+    masked = masked.replace(/^(\d{2})\.(\d{3})\.(\d{3})(\d)/, "$1.$2.$3/$4");
+    masked = masked.replace(/^(\d{2})\.(\d{3})\.(\d{3})\/(\d{4})(\d)/, "$1.$2.$3/$4-$5");
 
-// ---------- Validação de CNPJ ----------
-(function () {
-  const input = document.getElementById('cnpj');
-  const dot = document.getElementById('statusDot');
-  const helper = document.getElementById('cnpjHelper');
-  const btn = document.getElementById('submit');
-  const form = document.getElementById('miniForm');
-
-  function onlyDigits(v) { return v.replace(/\D/g, '').slice(0, 14); }
-
-  function maskCNPJ(digits) {
-    let out = digits;
-    out = out.replace(/^(\d{2})(\d)/, '$1.$2');
-    out = out.replace(/^(\d{2})\.(\d{3})(\d)/, '$1.$2.$3');
-    out = out.replace(/(\d{3})(\d{1,4})$/, '$1/$2');
-    out = out.replace(/(\d{4})(\d{1,2})$/, '$1-$2');
-    return out;
+    return masked;
   }
 
-  // Algoritmo oficial de validação de CNPJ (dígitos verificadores, módulo 11)
-  function isValidCNPJ(digits) {
-    if (digits.length !== 14) return false;
-    if (/^(\d)\1{13}$/.test(digits)) return false; // todos os dígitos iguais são inválidos
+  // valida os dígitos verificadores do CNPJ (algoritmo módulo 11 oficial)
+  function isValidCNPJ(rawValue) {
+    const cnpj = rawValue.replace(/\D/g, "");
 
-    const calcDigit = (base) => {
+    if (cnpj.length !== 14) return false;
+    if (/^(\d)\1{13}$/.test(cnpj)) return false; // rejeita sequências tipo 11111111111111
+
+    const calcCheckDigit = (base) => {
       const weights = base.length === 12
         ? [5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2]
         : [6, 5, 4, 3, 2, 9, 8, 7, 6, 5, 4, 3, 2];
-      let sum = 0;
-      for (let i = 0; i < base.length; i++) sum += parseInt(base[i], 10) * weights[i];
-      const rest = sum % 11;
-      return rest < 2 ? 0 : 11 - rest;
+
+      const sum = base
+        .split("")
+        .reduce((acc, digit, i) => acc + parseInt(digit, 10) * weights[i], 0);
+
+      const remainder = sum % 11;
+      return remainder < 2 ? 0 : 11 - remainder;
     };
 
-    const base12 = digits.slice(0, 12);
-    const dv1 = calcDigit(base12);
-    const base13 = base12 + dv1;
-    const dv2 = calcDigit(base13);
+    const base12 = cnpj.slice(0, 12);
+    const digit1 = calcCheckDigit(base12);
+    const digit2 = calcCheckDigit(base12 + digit1);
 
-    return digits === base13 + dv2;
+    return cnpj === base12 + String(digit1) + String(digit2);
   }
 
-  input.addEventListener('input', () => {
-    const digits = onlyDigits(input.value);
-    input.value = maskCNPJ(digits);
+  function updateState() {
+    const raw = input.value.replace(/\D/g, "");
 
-    input.classList.remove('valid', 'invalid');
-    dot.classList.remove('valid', 'invalid');
-
-    if (digits.length === 0) {
-      helper.textContent = 'Digite apenas os números — a formatação é automática.';
-      helper.className = 'helper';
-      btn.disabled = true;
+    if (raw.length === 0) {
+      feedback.textContent = "";
+      feedback.classList.remove("ok");
+      input.classList.remove("valid", "invalid");
+      setButtonEnabled(false);
       return;
     }
-    if (digits.length < 14) {
-      helper.textContent = 'Continue digitando: faltam ' + (14 - digits.length) + ' dígito(s).';
-      helper.className = 'helper';
-      btn.disabled = true;
+
+    if (raw.length < 14) {
+      feedback.textContent = "CNPJ incompleto";
+      feedback.classList.remove("ok");
+      input.classList.remove("valid");
+      input.classList.add("invalid");
+      setButtonEnabled(false);
       return;
     }
-    if (isValidCNPJ(digits)) {
-      input.classList.add('valid');
-      dot.classList.add('valid');
-      helper.textContent = 'CNPJ válido. Pronto para iniciar a busca.';
-      helper.className = 'helper valid';
-      btn.disabled = false;
+
+    if (isValidCNPJ(raw)) {
+      feedback.textContent = "CNPJ válido";
+      feedback.classList.add("ok");
+      input.classList.remove("invalid");
+      input.classList.add("valid");
+      setButtonEnabled(true);
     } else {
-      input.classList.add('invalid');
-      dot.classList.add('invalid');
-      helper.textContent = 'Este CNPJ não é válido. Confira os números digitados.';
-      helper.className = 'helper invalid';
-      btn.disabled = true;
+      feedback.textContent = "CNPJ inválido";
+      feedback.classList.remove("ok");
+      input.classList.remove("valid");
+      input.classList.add("invalid");
+      setButtonEnabled(false);
+    }
+  }
+
+  function setButtonEnabled(enabled) {
+    button.disabled = !enabled;
+    button.classList.toggle("enabled", enabled);
+  }
+
+  input.addEventListener("input", (e) => {
+    const cursorAtEnd = e.target.selectionStart === e.target.value.length;
+    e.target.value = maskCNPJ(e.target.value);
+    if (cursorAtEnd) {
+      e.target.selectionStart = e.target.selectionEnd = e.target.value.length;
+    }
+    updateState();
+  });
+
+  // ============ CONFIGURAÇÃO DO BACKEND ============
+  // Troque pela URL do seu serviço no Render depois do deploy, ex.:
+  // const API_BASE_URL = "https://icaro-backend.onrender.com";
+  const API_BASE_URL = "https://prestador-backend.onrender.com";
+
+  const loadingEl = document.getElementById("loading");
+  const resultsEl = document.getElementById("results");
+
+  button.addEventListener("click", async () => {
+    if (button.disabled) return;
+
+    const cnpjDigits = input.value.replace(/\D/g, "");
+
+    resultsEl.classList.remove("visible");
+    resultsEl.innerHTML = "";
+    loadingEl.classList.add("visible");
+    setButtonEnabled(false);
+
+    const [minhaReceita, brasilApi] = await Promise.allSettled([
+      fetchMinhaReceita(cnpjDigits),
+      fetchBrasilAPI(cnpjDigits)
+    ]);
+
+    loadingEl.classList.remove("visible");
+    setButtonEnabled(true);
+
+    const merged = renderResults(minhaReceita, brasilApi);
+
+    // com o nome e endereço em mãos, busca os dados do Google Maps
+    if (merged.nomeParaBusca && merged.enderecoParaBusca) {
+      await buscarGooglePlaces(merged.nomeParaBusca, merged.enderecoParaBusca);
     }
   });
 
-  // ---------- Formatação de exibição ----------
-  function formatPhone(ddd, numero) {
-    if (!ddd || !numero) return null;
-    const clean = numero.replace(/\D/g, '');
-    if (clean.length === 9) {
-      return `(${ddd}) ${clean.slice(0, 5)}-${clean.slice(5)}`;
-    }
-    if (clean.length === 8) {
-      return `(${ddd}) ${clean.slice(0, 4)}-${clean.slice(4)}`;
-    }
-    return `(${ddd}) ${clean}`;
-  }
-
-  function formatCEP(cep) {
-    if (!cep) return null;
-    const c = String(cep).replace(/\D/g, '');
-    return c.length === 8 ? `${c.slice(0, 5)}-${c.slice(5)}` : c;
-  }
-
-  function svgIcon(pathD) {
-    return `<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="#ee1a63" stroke-width="2">${pathD}</svg>`;
-  }
-
-  const ICONS = {
-    phone: '<path d="M22 16.9v3a2 2 0 0 1-2.2 2 19.8 19.8 0 0 1-8.6-3.1 19.5 19.5 0 0 1-6-6 19.8 19.8 0 0 1-3.1-8.7A2 2 0 0 1 4.1 2h3a2 2 0 0 1 2 1.7c.1 1 .3 2 .7 3a2 2 0 0 1-.4 2.1L8 10.3a16 16 0 0 0 6 6l1.5-1.4a2 2 0 0 1 2.1-.4c1 .3 2 .5 3 .7a2 2 0 0 1 1.7 2z"/>',
-    mail: '<path d="M4 4h16a2 2 0 0 1 2 2v12a2 2 0 0 1-2 2H4a2 2 0 0 1-2-2V6a2 2 0 0 1 2-2z"/><path d="M22 6l-10 7L2 6"/>',
-    pin: '<path d="M20 10c0 6-8 12-8 12s-8-6-8-12a8 8 0 0 1 16 0z"/><circle cx="12" cy="10" r="3"/>',
-    building: '<path d="M4 19V5a2 2 0 0 1 2-2h8l6 6v10a2 2 0 0 1-2 2H6a2 2 0 0 1-2-2z"/><path d="M14 3v6h6"/>',
-    users: '<path d="M17 21v-2a4 4 0 0 0-4-4H5a4 4 0 0 0-4 4v2"/><circle cx="9" cy="7" r="4"/><path d="M23 21v-2a4 4 0 0 0-3-3.87"/><path d="M16 3.13a4 4 0 0 1 0 7.75"/>',
-    cash: '<rect x="2" y="6" width="20" height="12" rx="2"/><circle cx="12" cy="12" r="3"/><path d="M6 10v.01M18 14v.01"/>',
-    briefcase: '<rect x="2" y="7" width="20" height="14" rx="2"/><path d="M16 21V5a2 2 0 0 0-2-2h-4a2 2 0 0 0-2 2v16"/>',
-    list: '<path d="M8 6h13M8 12h13M8 18h13"/><path d="M3 6h.01M3 12h.01M3 18h.01"/>'
-  };
-
-  function renderRow(iconKey, label, value, muted) {
-    return `
-      <div class="result-row">
-        ${svgIcon(ICONS[iconKey])}
-        <div>
-          <p class="rl">${label}</p>
-          <p class="rv${muted ? ' muted' : ''}">${value}</p>
-        </div>
-      </div>`;
-  }
-
-  function renderListRow(iconKey, label, items) {
-    if (!items || items.length === 0) {
-      return renderRow(iconKey, label, 'Não informado', true);
-    }
-    return `
-      <div class="result-row">
-        ${svgIcon(ICONS[iconKey])}
-        <div>
-          <p class="rl">${label}</p>
-          <ul class="result-list">${items.map((i) => `<li>${i}</li>`).join('')}</ul>
-        </div>
-      </div>`;
-  }
-
-  function formatMoeda(valor) {
-    if (valor === null || valor === undefined) return null;
-    return Number(valor).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-  }
-
-  const ICARO_API = 'https://icaro-backend.onrender.com'; // backend hospedado no Render
-
-  async function buscarPrestador(digits) {
-    const resultBox = document.getElementById('result');
-    resultBox.classList.remove('show');
-
-    btn.disabled = true;
-    const originalLabel = btn.textContent;
-    btn.innerHTML = '<span class="spinner"></span>Buscando…';
+  async function buscarGooglePlaces(nome, endereco) {
+    const googleBlock = document.createElement("div");
+    googleBlock.className = "google-block";
+    googleBlock.innerHTML = `<p class="source-title">Google Maps</p><p class="error-text" style="color:#8fb3d1;">Buscando dados do Google...</p>`;
+    resultsEl.appendChild(googleBlock);
 
     try {
-      const res = await fetch(`${ICARO_API}/api/consulta/${digits}`, {
-        headers: { 'Accept': 'application/json' }
-      });
+      const url = `${API_BASE_URL}/api/google-places?nome=${encodeURIComponent(nome)}&endereco=${encodeURIComponent(endereco)}`;
+      const response = await fetch(url);
+      const data = await response.json();
 
-      if (res.status === 404) {
-        resultBox.innerHTML = `<p class="result-error">CNPJ não encontrado. Confira o número e tente novamente.</p>`;
-        resultBox.classList.add('show');
-        return;
+      if (!response.ok || !data.encontrado) {
+        throw new Error(data.error || "Estabelecimento não encontrado no Google.");
       }
-      if (!res.ok) throw new Error('status ' + res.status);
 
-      const data = await res.json();
-      const c = data.consolidado || {};
-      const rf = data.fontes?.receita_federal;
-
-      const enderecoLinhas = c.endereco ? [
-        [c.endereco.logradouro, c.endereco.numero ? `nº ${c.endereco.numero}` : null, c.endereco.complemento].filter(Boolean).join(', '),
-      ].filter(Boolean).join('') : '';
-
-      const cidadeLinha = c.endereco ? [c.endereco.bairro, c.endereco.municipio, c.endereco.uf].filter(Boolean).join(' – ') : '';
-      const cepLinha = c.endereco?.cep ? formatCEP(c.endereco.cep) : '';
-
-      const ativa = c.situacao_cadastral === 'ATIVA';
-
-      const capitalFormatado = formatMoeda(c.capital_social);
-      const sociosLista = (c.socios || []).map(
-        (s) => `${s.nome}${s.qualificacao ? ` <span class="sub">— ${s.qualificacao}</span>` : ''}`
-      );
-      const cnaesLista = (c.cnaes_secundarios || []).map(
-        (cn) => `${cn.descricao}${cn.codigo ? ` <span class="sub">(${cn.codigo})</span>` : ''}`
-      );
-
-      resultBox.innerHTML = `
-        <div class="result-card">
-          <p class="result-name">${c.nome || 'Prestador encontrado'}</p>
-          <p class="result-status${ativa ? '' : ' inactive'}">
-            <span class="dot"></span>${c.situacao_cadastral || 'situação não informada'}
-          </p>
-
-          ${renderRow('phone', 'Telefone', (c.telefones || []).join(' · ') || 'Não informado', !(c.telefones || []).length)}
-          ${renderRow('mail', 'E-mail', (c.emails || []).join(' · ') || 'Não informado na Receita Federal', !(c.emails || []).length)}
-          ${renderRow('building', 'Endereço', enderecoLinhas || 'Não informado', !enderecoLinhas)}
-          ${renderRow('pin', 'Bairro / cidade / CEP', [cidadeLinha, cepLinha].filter(Boolean).join(' · ') || 'Não informado', !cidadeLinha)}
-
-          <hr class="result-divider">
-
-          ${renderRow('briefcase', 'Natureza jurídica', c.natureza_juridica || 'Não informado', !c.natureza_juridica)}
-          ${renderRow('cash', 'Capital social / porte', [capitalFormatado, c.porte].filter(Boolean).join(' · ') || 'Não informado', !capitalFormatado)}
-          ${renderRow('building', 'Atividade principal (CNAE)', c.cnae_principal || 'Não informado', !c.cnae_principal)}
-          ${renderListRow('list', 'Outras atividades (CNAEs secundários)', cnaesLista)}
-          ${renderListRow('users', 'Sócios (QSA)', sociosLista)}
-        </div>
-      `;
-      resultBox.classList.add('show');
-
+      renderGoogleBlock(googleBlock, data);
     } catch (err) {
-      console.error('Erro ao consultar CNPJ:', err);
-      resultBox.innerHTML = `<p class="result-error">Não foi possível falar com o backend do ÍCARO agora. Confira se ele está rodando em ${ICARO_API} e tente novamente.</p>`;
-      resultBox.classList.add('show');
-    } finally {
-      btn.disabled = false;
-      btn.textContent = originalLabel;
-      btn.disabled = !isValidCNPJ(onlyDigits(input.value));
+      console.error("Erro na busca do Google Places:", err);
+      googleBlock.innerHTML = `
+        <p class="source-title error">Google Maps</p>
+        <p class="error-text">Não foi possível encontrar este estabelecimento no Google Maps.</p>
+        <p class="error-text" style="opacity:0.7; margin-top:4px;">Detalhe: ${err.message}</p>
+      `;
     }
   }
 
-  form.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const digits = onlyDigits(input.value);
-    if (!isValidCNPJ(digits)) return;
-    buscarPrestador(digits);
-  });
-})();
+  function renderGoogleBlock(container, data) {
+    const rating = data.nota != null ? data.nota.toFixed(1) : "—";
+    const totalAvaliacoes = data.totalAvaliacoes != null ? `${data.totalAvaliacoes} avaliações` : "sem avaliações";
+
+    let openBadge = "";
+    if (data.abertoAgora === true) openBadge = `<span class="open-badge open">Aberto agora</span>`;
+    else if (data.abertoAgora === false) openBadge = `<span class="open-badge closed">Fechado agora</span>`;
+
+    const hoursHtml = buildHoursList(data.horarioFuncionamento);
+
+    const transporteBadge = (icon, valor, label) => {
+      const count = valor === null ? "—" : valor;
+      return `<span class="transport-badge">${icon} ${label}: <span class="count">${count}</span></span>`;
+    };
+
+    const photosHtml = data.fotos?.length
+      ? `
+        <p class="transport-title">Fotos dos clientes (${data.fotos.length})</p>
+        <div class="photos-grid">
+          ${data.fotos.map((f, i) => `
+            <div class="photo-card">
+              <a href="${API_BASE_URL}${f.url}&maxwidth=1200" target="_blank" rel="noopener">
+                <img data-photo-index="${i}" src="${API_BASE_URL}${f.url}" loading="lazy" alt="Foto do estabelecimento" />
+              </a>
+              ${f.parte ? `<span class="photo-tag">${f.parte}</span>` : ""}
+              ${f.resumo ? `<p class="photo-caption">${f.resumo}</p>` : ""}
+            </div>
+          `).join("")}
+        </div>
+      `
+      : `
+        <p class="transport-title">Fotos dos clientes</p>
+        <p class="error-text" style="color:#8fb3d1;">
+          A API do Google não disponibilizou fotos para este estabelecimento.
+          ${data.linkGoogleMaps ? `<a href="${data.linkGoogleMaps}" target="_blank" rel="noopener" style="color:#7fc4ff;">Ver no Google Maps →</a>` : ""}
+        </p>
+      `;
+
+    container.innerHTML = `
+      <p class="source-title">Google Maps</p>
+      <p class="google-match">Encontrado como: <strong>${data.nome}</strong> — ${data.enderecoFormatado}</p>
+      <div class="rating-row">
+        <span class="rating-score">${rating} ★</span>
+        <span class="rating-count">${totalAvaliacoes}</span>
+        ${openBadge}
+      </div>
+      ${hoursHtml}
+      <p class="transport-title">Transporte próximo</p>
+      <div class="transport-row">
+        ${transporteBadge("🚌", data.transporte.pontosOnibus, "Ônibus")}
+        ${transporteBadge("🚆", data.transporte.estacoesTrem, "Trem")}
+        ${transporteBadge("🚇", data.transporte.estacoesMetro, "Metrô")}
+      </div>
+      ${buildAccessibilityBadges(data.acessibilidade)}
+      ${photosHtml}
+    `;
+
+    container.querySelectorAll(".photos-grid img").forEach((img) => {
+      img.addEventListener("error", () => {
+        console.error("Falha ao carregar foto:", img.src);
+        const placeholder = document.createElement("span");
+        placeholder.className = "photo-error";
+        placeholder.textContent = "Falha ao carregar";
+        img.replaceWith(placeholder);
+      });
+    });
+  }
+
+  // monta a lista de horários em linhas alinhadas (dia à esquerda, horário à direita),
+  // destacando o dia de hoje
+  // monta os badges de acessibilidade: sim (verde), não (vermelho) ou não informado (neutro)
+  function buildAccessibilityBadges(acessibilidade) {
+    const itens = [
+      ["♿", acessibilidade.entradaAcessivel, "Entrada"],
+      ["🅿️", acessibilidade.estacionamentoAcessivel, "Estacionamento"],
+      ["🚻", acessibilidade.banheiroAcessivel, "Banheiro"],
+      ["💺", acessibilidade.assentosAcessiveis, "Assentos"]
+    ];
+
+    const badges = itens.map(([icon, valor, label]) => {
+      let statusClass, statusText;
+      if (valor === true) { statusClass = "yes"; statusText = "Sim"; }
+      else if (valor === false) { statusClass = "no"; statusText = "Não"; }
+      else { statusClass = "unknown"; statusText = "Não informado"; }
+
+      return `<span class="accessibility-badge ${statusClass}">${icon} ${label}: <strong>${statusText}</strong></span>`;
+    }).join("");
+
+    return `
+      <p class="transport-title">Acessibilidade</p>
+      <div class="transport-row">${badges}</div>
+    `;
+  }
+
+  function buildHoursList(weekdayDescriptions) {
+    if (!weekdayDescriptions?.length) {
+      return `<p class="error-text" style="color:#8fb3d1;">Horário não informado</p>`;
+    }
+
+    // weekdayDescriptions vem na ordem segunda(0) ... domingo(6); getDay() retorna domingo(0) ... sábado(6)
+    const todayIndex = (new Date().getDay() + 6) % 7;
+
+    const rows = weekdayDescriptions.map((line, i) => {
+      const match = line.match(/^([^:]+):\s*(.*)$/);
+      const dayName = match ? match[1] : line;
+      const hours = match ? match[2] : "";
+      const isClosed = /fechado/i.test(hours) || hours === "";
+      const isToday = i === todayIndex;
+
+      return `
+        <li class="${isToday ? "today" : ""}">
+          <span class="day-name">${dayName}</span>
+          <span class="day-hours ${isClosed ? "closed-text" : ""}">${hours || "Fechado"}</span>
+        </li>
+      `;
+    }).join("");
+
+    return `
+      <p class="hours-title">Horário de funcionamento</p>
+      <ul class="hours-list">${rows}</ul>
+    `;
+  }
+
+  async function fetchMinhaReceita(cnpj) {
+    const response = await fetch(`${API_BASE_URL}/api/minha-receita/${cnpj}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    return data;
+  }
+
+  async function fetchBrasilAPI(cnpj) {
+    const response = await fetch(`${API_BASE_URL}/api/brasil-api/${cnpj}`);
+    const data = await response.json();
+    if (!response.ok) throw new Error(data.error || `HTTP ${response.status}`);
+    return data;
+  }
+
+  function renderResults(minhaReceitaResult, brasilApiResult) {
+    const mr = minhaReceitaResult.status === "fulfilled" ? normalizeMinhaReceita(minhaReceitaResult.value) : {};
+    const ba = brasilApiResult.status === "fulfilled" ? normalizeBrasilAPI(brasilApiResult.value) : {};
+
+    // pega o primeiro valor não vazio entre as duas fontes, nessa ordem de prioridade
+    const pick = (key) => {
+      const v1 = mr[key];
+      const v2 = ba[key];
+      if (v1 !== undefined && v1 !== null && String(v1).trim() !== "") return v1;
+      if (v2 !== undefined && v2 !== null && String(v2).trim() !== "") return v2;
+      return "Não localizado";
+    };
+
+    const fields = [
+      ["Razão social", pick("razaoSocial")],
+      ["Nome fantasia", pick("nomeFantasia")],
+      ["Situação cadastral", pick("situacaoCadastral")],
+      ["Atividade principal", pick("atividadePrincipal")],
+      ["Endereço", pick("endereco")],
+      ["CEP", formatCEP(pick("cep"))],
+      ["Telefone", formatPhone(pick("telefone"))],
+      ["E-mail", pick("email")]
+    ];
+
+    resultsEl.innerHTML = "";
+
+    const block = document.createElement("div");
+    block.className = "source-block";
+
+    fields.forEach(([label, value]) => {
+      const row = document.createElement("div");
+      row.className = "data-row";
+      row.innerHTML = `
+        <span class="data-label">${label}</span>
+        <span class="data-value">${value}</span>
+      `;
+      block.appendChild(row);
+    });
+
+    resultsEl.appendChild(block);
+    resultsEl.classList.add("visible");
+
+    return {
+      nomeParaBusca: fields[1][1] !== "Não localizado" ? fields[1][1] : fields[0][1], // prefere nome fantasia, cai pro razão social
+      enderecoParaBusca: fields[4][1] !== "Não localizado" ? fields[4][1].replace(/·/g, ",") : ""
+    };
+  }
+
+  // organiza os campos que vêm da API MinhaReceita em um formato comum
+  function normalizeMinhaReceita(d) {
+    return {
+      razaoSocial: d.razao_social,
+      nomeFantasia: d.nome_fantasia,
+      situacaoCadastral: d.descricao_situacao_cadastral,
+      atividadePrincipal: d.cnae_fiscal_descricao,
+      endereco: formatEndereco(d.logradouro, d.numero, d.municipio, d.uf),
+      cep: d.cep,
+      telefone: d.ddd_telefone_1,
+      email: d.email
+    };
+  }
+
+  // organiza os campos que vêm da BrasilAPI em um formato comum
+  function normalizeBrasilAPI(d) {
+    return {
+      razaoSocial: d.razao_social,
+      nomeFantasia: d.nome_fantasia,
+      situacaoCadastral: d.descricao_situacao_cadastral,
+      atividadePrincipal: d.cnae_fiscal_descricao,
+      endereco: formatEndereco(d.logradouro, d.numero, d.municipio, d.uf),
+      cep: d.cep,
+      telefone: d.ddd_telefone_1,
+      email: d.email
+    };
+  }
+
+  function formatEndereco(logradouro, numero, municipio, uf) {
+    const parts = [
+      [logradouro, numero].filter(Boolean).join(", "),
+      [municipio, uf].filter(Boolean).join(" - ")
+    ].filter(Boolean);
+    return parts.join(" · ");
+  }
+
+  // formata CEP como 00000-000
+  function formatCEP(value) {
+    if (!value || value === "Não localizado") return value;
+    const digits = String(value).replace(/\D/g, "");
+    if (digits.length !== 8) return value;
+    return `${digits.slice(0, 5)}-${digits.slice(5)}`;
+  }
+
+  // formata telefone como (XX)XXXXX-XXXX (celular, 11 dígitos)
+  // ou (XX)XXXX-XXXX (fixo, 10 dígitos)
+  function formatPhone(value) {
+    if (!value || value === "Não localizado") return value;
+    const digits = String(value).replace(/\D/g, "");
+
+    if (digits.length === 11) {
+      return `(${digits.slice(0, 2)})${digits.slice(2, 7)}-${digits.slice(7)}`;
+    }
+    if (digits.length === 10) {
+      return `(${digits.slice(0, 2)})${digits.slice(2, 6)}-${digits.slice(6)}`;
+    }
+    return value;
+  }
 </script>
 
 </body>
